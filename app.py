@@ -7,19 +7,30 @@ import os
 
 app = Flask(__name__)
 
-# Route untuk menampilkan pesan Halo dari server playroom saat mengakses root
 @app.route('/')
 def hello():
     return jsonify({'message': 'Halo dari server playroom'})
 
-def compare_images_ssim(img1_path, img2_path):
-    img1 = cv2.imread(img1_path)
-    img2 = cv2.imread(img2_path)
-    img2_resized = cv2.resize(img2, (img1.shape[1], img1.shape[0]))
-    img1_gray = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
-    img2_gray = cv2.cvtColor(img2_resized, cv2.COLOR_BGR2GRAY)
+def compress_and_resize_image(image_path, max_size=(500, 500)):
+    img = cv2.imread(image_path, cv2.IMREAD_REDUCED_COLOR_2)
+    height, width = img.shape[:2]
 
-    similarity_index, _ = ssim(img1_gray, img2_gray, full=True)
+    # Resize jika ukuran gambar lebih besar dari max_size
+    if height > max_size[1] or width > max_size[0]:
+        img = cv2.resize(img, max_size, interpolation=cv2.INTER_AREA)
+    
+    # Simpan ulang gambar yang telah dikompresi
+    cv2.imwrite(image_path, img)
+
+def compare_images_ssim(img1_path, img2_path):
+    img1 = cv2.imread(img1_path, cv2.IMREAD_GRAYSCALE)
+    img2 = cv2.imread(img2_path, cv2.IMREAD_GRAYSCALE)
+
+    # Resize img2 ke ukuran img1
+    img2_resized = cv2.resize(img2, (img1.shape[1], img1.shape[0]))
+
+    # Hitung SSIM
+    similarity_index, _ = ssim(img1, img2_resized, full=True)
     return similarity_index
 
 @app.route('/compare', methods=['POST'])
@@ -37,6 +48,10 @@ def compare():
         with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file2:
             img2_path = temp_file2.name
             image2.save(img2_path)
+
+        # Kompres dan resize gambar
+        compress_and_resize_image(img1_path)
+        compress_and_resize_image(img2_path)
 
         # Menghitung SSIM
         ssim_score = compare_images_ssim(img1_path, img2_path)
@@ -58,6 +73,5 @@ def compare():
         # Jika ada error, kembalikan error message
         return jsonify({'error': str(e)}), 500
 
-# Pastikan aplikasi berjalan pada port yang sesuai untuk Vercel
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
