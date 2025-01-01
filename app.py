@@ -4,7 +4,6 @@ from skimage.metrics import structural_similarity as ssim
 import numpy as np
 import tempfile
 import os
-import threading
 
 app = Flask(__name__)
 
@@ -23,8 +22,13 @@ def compare_images_ssim(img1_path, img2_path):
     similarity_index, _ = ssim(img1_gray, img2_gray, full=True)
     return similarity_index
 
-def process_comparison(image1, image2, result_callback):
+@app.route('/compare', methods=['POST'])
+def compare():
     try:
+        # Mengambil file gambar dari request
+        image1 = request.files['image1']
+        image2 = request.files['image2']
+        
         # Menggunakan tempfile untuk menyimpan file sementara
         with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file1:
             img1_path = temp_file1.name
@@ -44,32 +48,15 @@ def process_comparison(image1, image2, result_callback):
         os.remove(img1_path)
         os.remove(img2_path)
 
-        # Menyampaikan hasil melalui callback
-        result_callback(ssim_score, result)
-    
-    except Exception as e:
-        result_callback(error=str(e))
-
-@app.route('/compare', methods=['POST'])
-def compare():
-    def result_callback(ssim_score=None, result=None, error=None):
-        if error:
-            return jsonify({'error': error}), 500
+        # Mengembalikan hasil SSIM dan hasil perbandingan
         return jsonify({
-            'ssim_score': round(ssim_score * 100, 2),
+            'ssim_score': round(ssim_score * 100, 2), 
             'result': result
         })
-
-    # Mengambil file gambar dari request
-    image1 = request.files['image1']
-    image2 = request.files['image2']
-
-    # Jalankan perbandingan gambar dalam thread terpisah
-    thread = threading.Thread(target=process_comparison, args=(image1, image2, result_callback))
-    thread.start()
-
-    # Mengembalikan respons awal agar koneksi tidak tertutup
-    return jsonify({'message': 'Proses perbandingan sedang berlangsung, hasil akan dikirimkan setelah selesai.'})
+    
+    except Exception as e:
+        # Jika ada error, kembalikan error message
+        return jsonify({'error': str(e)}), 500
 
 # Pastikan aplikasi berjalan pada port yang sesuai untuk Vercel
 if __name__ == '__main__':
