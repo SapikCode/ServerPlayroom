@@ -57,7 +57,7 @@ def compare():
         ssim_score = compare_images_ssim(img1_path, img2_path)
 
         # Menentukan hasil berdasarkan SSIM
-        result = "benar" if ssim_score > 0.5 else "salah"
+        result = "benar" if ssim_score > 0.6 else "salah"
 
         # Menghapus file sementara setelah digunakan
         os.remove(img1_path)
